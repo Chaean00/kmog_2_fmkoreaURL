@@ -49,14 +49,13 @@ def run():
         os.environ['WDM_LOCAL'] = os.path.dirname(os.path.abspath(__file__))
 
     chromedriver_autoinstaller.install()
-
     options = Options()
     options.add_argument('--headless')
     options.add_experimental_option("prefs", prefs)
     driver = webdriver.Chrome(options=options)
     driver.set_window_size(1920, 1080)
     driver.implicitly_wait(10)
-    cnt = 0
+
     urlLists = [urlEntry1.get(), urlEntry2.get(), urlEntry3.get(),
                 urlEntry4.get(), urlEntry5.get(), urlEntry6.get(),
                 urlEntry7.get(), urlEntry8.get(), urlEntry9.get(),
@@ -64,8 +63,9 @@ def run():
                 urlEntry13.get(), urlEntry14.get(), urlEntry15.get(),
                 urlEntry16.get(), urlEntry17.get(), urlEntry18.get(),
                 urlEntry19.get(), urlEntry20.get()]
+
+    print(urlLists)
     for urlList in urlLists:
-        cnt += 1
         if not os.path.exists(formatted_today):
             if dirName:
                 os.mkdir(dirName + '/' + formatted_today)
@@ -98,17 +98,6 @@ def run():
 
                 try:
                     urllib.request.urlretrieve(src, filepath)
-                except urllib.error.HTTPError as e:
-                    if e.code == 404:
-                        print(f"Error 404: Resource not found at {src}")
-                    elif e.code == 403:
-                        print(f"Error 403: Forbidden, access denied at {src}")
-                    elif e.code == 429:
-                        print(f"Error 429: Too many requests at {src}")
-                    elif e.code == 503:
-                        print(f"Error 503: Service unavailable at {src}")
-                    else:
-                        print(f"HTTPError downloading {src}: {e}")
                 except Exception as e:
                     print(f"Error downloading {src}: {e}")
                 else:
@@ -118,58 +107,43 @@ def run():
             for vid_element in vid_elements:
                 post += 1
                 src = vid_element['src']
-                # print(src)
+                if src.startswith("//"):
+                    src = "https:" + src
 
+                # Vimeo
+                if re.search(r'player.vimeo.com/video', src):
+                    video_id = re.search(r'(\d+)', src).group()
+                    src = f'https://vimeo.com/{video_id}'
+
+                # KakaoTV
+                elif re.search(r'kakaotv.daum.net/embed', src):
+                    video_id = re.search(r'rv[\w\W]+my', src).group()[:-3]
+                    src = f'https://tv.kakao.com/channel/{video_id}'
+                print(src)
                 filename = str(post) + "_" + safe_fn + ".mp4"
                 if dirName == None:
                     filepath = os.path.join(formatted_today, filename)
                 else:
                     filepath = os.path.join(dirName, formatted_today, filename)
+                try:
+                    download_video(src, filepath)
+                except Exception as e:
+                    print(f"Error downloading {src}: {e}")
 
-                # streamable 영상일 때
-                if "streamable.com" in src:
-                    streamable_url = vid_element['src']
-                    video_param = streamable_url.split("/s/")[1].split("?")[0]
 
-                    VIDEO_API_URL = f"https://api.streamable.com/videos/{video_param}"
-                    response = requests.get(VIDEO_API_URL)
-                    src = response.json()['files']['mp4']['url']
-                    try:
-                        urllib.request.urlretrieve(src, filepath)
-                    except urllib.error.HTTPError as e:
-                        if e.code == 404:
-                            print(f"Error 404: Resource not found at {src}")
-                        elif e.code == 403:
-                            print(f"Error 403: Forbidden, access denied at {src}")
-                        elif e.code == 429:
-                            print(f"Error 429: Too many requests at {src}")
-                        elif e.code == 503:
-                            print(f"Error 503: Service unavailable at {src}")
-                        else:
-                            print(f"HTTPError downloading {src}: {e}")
-                    except Exception as e:
-                        print(f"Error downloading {src}: {e}")
-                    else:
-                        pass
-
-                # 유튜브 영상일때
-                elif "youtube.com" in src or "youtu.be" in src:
-                    video_id = src.split("/embed/")[1].split("?")[0]
-                    standard_url = f"https://www.youtube.com/watch?v={video_id}"
-                    print(standard_url)
-                    ydl_opts = {
-                        'format': 'best',
-                        'outtmpl': filepath,
-                        'verbos': True,
-                    }
-                    try:
-                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                            ydl.download([standard_url])
-                    except Exception as e:
-                        print(f"Error downloading YouTube video: {e}")
 
     runBtn.config(state="normal")
     msgbox.showinfo("Info", "작업이 완료되었습니다.")
+
+def download_video(url, filepath):
+    ydl_opts = {
+        'format': 'best',
+        'outtmpl': filepath,
+        'verbos': True,
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
 
 
 # 값 비어있으면 에러메세지 + 스레드 실행
