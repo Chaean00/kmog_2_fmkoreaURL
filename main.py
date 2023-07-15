@@ -19,6 +19,7 @@ from datetime import datetime
 def ask_directory():
     global dirName
     dirName = filedialog.askdirectory()
+    # dirName = os.path.abspath(dirName)
     print(dirName)
 
 
@@ -35,9 +36,7 @@ def clean_filename(filename):
 def run():
     global dirName
     runBtn.config(state="disabled")
-    today = datetime.now()
-    formatted_today = today.strftime("%Y%m%d_%H%M%S")
-    post = 0
+
     prefs = {
         "profile.managed_default_content_settings.stylesheets": 2,
     }
@@ -56,6 +55,10 @@ def run():
     driver.set_window_size(1920, 1080)
     driver.implicitly_wait(10)
 
+    today = datetime.now()
+    formatted_today = today.strftime("%Y%m%d_%H%M%S")
+    post = 0
+
     urlLists = [urlEntry1.get(), urlEntry2.get(), urlEntry3.get(),
                 urlEntry4.get(), urlEntry5.get(), urlEntry6.get(),
                 urlEntry7.get(), urlEntry8.get(), urlEntry9.get(),
@@ -64,14 +67,25 @@ def run():
                 urlEntry16.get(), urlEntry17.get(), urlEntry18.get(),
                 urlEntry19.get(), urlEntry20.get()]
 
-    print(urlLists)
+    # urlLists의 값이 비어있는지? True / False
+    isNone = all(url == "" for url in urlLists)
+    if isNone:
+        runBtn.config(state="normal")
+        msgbox.showerror("Error", "URL을 입력하세요.")
+        return
+
+    # 폴더 생성
+    if not os.path.exists(formatted_today):
+        if dirName:
+            os.mkdir(dirName + '/' + formatted_today)
+        else:
+            os.mkdir(formatted_today)
+
     for urlList in urlLists:
-        if not os.path.exists(formatted_today):
-            if dirName:
-                os.mkdir(dirName + '/' + formatted_today)
-            else:
-                os.mkdir(formatted_today)
+
         if urlList != '':
+
+
             r = requests.get(urlList)
             soup = BeautifulSoup(r.text, "html.parser")
 
@@ -85,7 +99,7 @@ def run():
             img_elements = div_element.find_all('img')
             vid_elements = div_element.find_all('iframe')
 
-            # 이미지 다운로드
+            # 이미지, 움짤 다운로드
             for img_element in img_elements:
                 post += 1
                 src = img_element['src']
@@ -119,6 +133,7 @@ def run():
                 elif re.search(r'kakaotv.daum.net/embed', src):
                     video_id = re.search(r'rv[\w\W]+my', src).group()[:-3]
                     src = f'https://tv.kakao.com/channel/{video_id}'
+
                 print(src)
                 filename = str(post) + "_" + safe_fn + ".mp4"
                 if dirName == None:
@@ -129,9 +144,6 @@ def run():
                     download_video(src, filepath)
                 except Exception as e:
                     print(f"Error downloading {src}: {e}")
-
-
-
     runBtn.config(state="normal")
     msgbox.showinfo("Info", "작업이 완료되었습니다.")
 
@@ -148,16 +160,10 @@ def download_video(url, filepath):
 
 # 값 비어있으면 에러메세지 + 스레드 실행
 def validate_and_run():
-    urlText = urlEntry1.get()
-
-    if not urlText:
-        msgbox.showerror("Error", "URL을 입력하세요.")
-        return
 
     # 검색어와 파일 개수가 모두 입력되면 run 함수 실행
     t = threading.Thread(target=run, daemon=True)
     t.start()
-
 
 if __name__ == "__main__":
     dirName = None
@@ -275,6 +281,7 @@ if __name__ == "__main__":
 
     runBtn = Button(window, text="실행", height=3, width=20, relief="ridge", command=validate_and_run)  # 실행 버튼
     runBtn.place(x=450, y=500)
+    window.bind('<Return>', lambda event: runBtn.invoke())
 
     dirBtn = Button(window, text="폴더 선택", relief="ridge", command=ask_directory)
     dirBtn.place(x=700, y=500)
